@@ -1,5 +1,10 @@
 import cv2
 from ultralytics import YOLO
+import torch
+from ultralytics.nn.tasks import DetectionModel
+
+torch.serialization.add_safe_globals([DetectionModel])
+
 
 class VehicleClassifier:
     """Vehicle Detection and Classification"""
@@ -36,6 +41,7 @@ class VehicleClassifier:
         """
         results = self.model(
             image,
+            device="cpu",
             conf=self.conf_threshold,
             imgsz=512,
             max_det=50,

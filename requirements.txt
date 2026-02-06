@@ -1,9 +1,32 @@
-streamlit==1.31.0
-ultralytics==8.1.0
-# opencv-python==4.9.0.80
+# streamlit==1.31.0
+# ultralytics==8.1.0
+# # opencv-python==4.9.0.80
+# opencv-python==4.6.0.66
+# paddleocr==2.7.3
+# paddlepaddle==2.6.2
+# numpy==1.26.4
+# pandas==2.2.0
+# Pillow==10.2.0
+# ---------- UI ----------
+streamlit==1.54.0
+
+# ---------- YOLO / Vision ----------
+ultralytics==8.0.227
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
+
+# ---------- OpenCV (compatible with YOLO + PaddleOCR) ----------
 opencv-python==4.6.0.66
+
+# ---------- OCR ----------
 paddleocr==2.7.3
 paddlepaddle==2.6.2
+
+# ---------- Core scientific stack ----------
 numpy==1.26.4
 pandas==2.2.0
 Pillow==10.2.0
+
+# ---------- Windows stability fix ----------
+py-cpuinfo==9.0.0

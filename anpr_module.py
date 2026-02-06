@@ -4,6 +4,10 @@ import re
 from ultralytics import YOLO
 from paddleocr import PaddleOCR
 import os
+import torch
+from ultralytics.nn.tasks import DetectionModel
+
+torch.serialization.add_safe_globals([DetectionModel])
 
 # Disable CUDA for PaddleOCR
 os.environ["FLAGS_use_cuda"] = "0"

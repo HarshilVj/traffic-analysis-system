@@ -7,6 +7,8 @@ import io
 import os
 from pathlib import Path
 import tempfile
+import os
+os.environ["YOLO_CPUINFO"] = "False"
 
 # Import custom modules
 from anpr_module import ANPRDetector
@@ -176,10 +178,10 @@ def main():
         
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded Image", use_container_width=True)
+            st.image(image, caption="Uploaded Image", width='stretch')
             
             # Process button
-            if st.button("🔍 Analyze Traffic", type="primary", use_container_width=True):
+            if st.button("🔍 Analyze Traffic", type="primary", width='stretch'):
                 # Initialize models
                 anpr_detector, vehicle_classifier = initialize_models()
                 
@@ -213,7 +215,7 @@ def main():
             
             # Convert BGR to RGB for display
             annotated_img_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
-            st.image(annotated_img_rgb, caption="Analyzed Image", use_container_width=True)
+            st.image(annotated_img_rgb, caption="Analyzed Image", width='stretch')
             
             # Download button for annotated image
             _, buffer = cv2.imencode('.jpg', annotated_img)
@@ -222,7 +224,7 @@ def main():
                 data=buffer.tobytes(),
                 file_name="traffic_analysis_result.jpg",
                 mime="image/jpeg",
-                use_container_width=True
+                width='stretch'
             )
         else:
             st.info("👆 Upload an image and click 'Analyze Traffic' to see results")
@@ -250,7 +252,7 @@ def main():
                             st.markdown("**📸 Number Plate**")
                             if result['plate_crop'] is not None and result['plate_crop'].size > 0:
                                 plate_rgb = cv2.cvtColor(result['plate_crop'], cv2.COLOR_BGR2RGB)
-                                st.image(plate_rgb, use_container_width=True)
+                                st.image(plate_rgb, width='stretch')
                             else:
                                 st.warning("No plate crop available")
                         
@@ -277,7 +279,7 @@ def main():
             with tab2:
                 # Create DataFrame
                 df = create_results_dataframe(results)
-                st.dataframe(df, use_container_width=True, hide_index=True)
+                st.dataframe(df, width='stretch', hide_index=True)
                 
                 # Statistics
                 st.markdown("### 📈 Statistics")
@@ -306,7 +308,7 @@ def main():
                     data=csv,
                     file_name="traffic_analysis_results.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    width='stretch'
                 )
                 
                 # JSON Export
@@ -328,7 +330,7 @@ def main():
                     data=json_str,
                     file_name="traffic_analysis_results.json",
                     mime="application/json",
-                    use_container_width=True
+                    width='stretch'
                 )
 
 if __name__ == "__main__":
