@@ -7,28 +7,58 @@
 # numpy==1.26.4
 # pandas==2.2.0
 # Pillow==10.2.0
-# ---------- UI ----------
-streamlit==1.54.0
 
-# ---------- YOLO / Vision ----------
+
+
+# # ---------- UI ----------
+# streamlit==1.54.0
+
+# # ---------- YOLO / Vision ----------
+# ultralytics==8.0.227
+# torch==2.5.1
+# torchvision==0.20.1
+# # torchaudio==2.5.1
+
+# # ---------- OpenCV (compatible with YOLO + PaddleOCR) ----------
+# # opencv-python==4.6.0.66
+# opencv-python-headless
+
+
+# # ---------- OCR ----------
+# paddleocr==2.7.3
+# paddlepaddle==2.6.2
+
+# # ---------- Core scientific stack ----------
+# numpy==1.26.4
+# pandas==2.2.0
+# Pillow==10.2.0
+
+# # ---------- Windows stability fix ----------
+# py-cpuinfo==9.0.0
+
+
+
+# ---------- Python UI ----------
+streamlit==1.31.0
+
+# ---------- YOLO / Torch (Python 3.11 compatible) ----------
 ultralytics==8.0.227
-torch==2.5.1
-torchvision==0.20.1
-# torchaudio==2.5.1
+torch==2.1.2
+torchvision==0.16.2
+torchaudio==2.1.2
 
-# ---------- OpenCV (compatible with YOLO + PaddleOCR) ----------
-# opencv-python==4.6.0.66
-opencv-python-headless
-
+# ---------- OpenCV (PaddleOCR-compatible) ----------
+opencv-python==4.6.0.66
 
 # ---------- OCR ----------
 paddleocr==2.7.3
 paddlepaddle==2.6.2
 
-# ---------- Core scientific stack ----------
+# ---------- Core ----------
 numpy==1.26.4
 pandas==2.2.0
 Pillow==10.2.0
 
-# ---------- Windows stability fix ----------
+# ---------- Stability ----------
 py-cpuinfo==9.0.0
+
