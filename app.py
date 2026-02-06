@@ -141,8 +141,8 @@ def main():
         
         # Model confidence thresholds
         st.subheader("Detection Settings")
-        vehicle_conf = st.slider("Vehicle Detection Confidence", 0.0, 1.0, 0.3, 0.05)
-        plate_conf = st.slider("Plate Detection Confidence", 0.0, 1.0, 0.4, 0.05)
+        vehicle_conf = st.slider("Vehicle Detection Confidence", 0.0, 1.0, 0.8, 0.01)
+        plate_conf = st.slider("Plate Detection Confidence", 0.0, 1.0, 0.4, 0.01)
         
         st.markdown("---")
         
