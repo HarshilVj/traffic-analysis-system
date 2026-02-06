@@ -279,7 +279,7 @@ def main():
             with tab2:
                 # Create DataFrame
                 df = create_results_dataframe(results)
-                st.dataframe(df, use_column_width=True, hide_index=True)
+                st.dataframe(df.reset_index(drop=True), use_container_width=True)
                 
                 # Statistics
                 st.markdown("### 📈 Statistics")
