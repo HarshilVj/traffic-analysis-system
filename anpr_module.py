@@ -7,7 +7,12 @@ import os
 import torch
 from ultralytics.nn.tasks import DetectionModel
 
-torch.serialization.add_safe_globals([DetectionModel])
+# Try to add safe globals if the method exists (PyTorch 2.3+)
+try:
+    torch.serialization.add_safe_globals([DetectionModel])
+except AttributeError:
+    # For older PyTorch versions, use weights_only=False when loading instead
+    pass
 
 # Disable CUDA for PaddleOCR
 os.environ["FLAGS_use_cuda"] = "0"
