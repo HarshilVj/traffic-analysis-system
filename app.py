@@ -181,7 +181,7 @@ def main():
             st.image(image, caption="Uploaded Image", use_column_width=True)
             
             # Process button
-            if st.button("🔍 Analyze Traffic", type="primary", use_column_width=True):
+            if st.button("🔍 Analyze Traffic", type="primary"):
                 # Initialize models
                 anpr_detector, vehicle_classifier = initialize_models()
                 
@@ -224,7 +224,7 @@ def main():
                 data=buffer.tobytes(),
                 file_name="traffic_analysis_result.jpg",
                 mime="image/jpeg",
-                use_column_width=True
+                # use_column_width=True
             )
         else:
             st.info("👆 Upload an image and click 'Analyze Traffic' to see results")
@@ -308,7 +308,7 @@ def main():
                     data=csv,
                     file_name="traffic_analysis_results.csv",
                     mime="text/csv",
-                    use_column_width=True
+                    # use_column_width=True
                 )
                 
                 # JSON Export
@@ -330,7 +330,7 @@ def main():
                     data=json_str,
                     file_name="traffic_analysis_results.json",
                     mime="application/json",
-                    use_column_width=True
+                    # use_column_width=True
                 )
 
 # if __name__ == "__main__":
