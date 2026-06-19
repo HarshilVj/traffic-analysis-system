@@ -2,8 +2,7 @@ import cv2
 import numpy as np
 import re
 from ultralytics import YOLO
-from paddleocr import PaddleOCR
-import os
+import easyocr
 import torch
 from ultralytics.nn.tasks import DetectionModel
 
@@ -11,11 +10,7 @@ from ultralytics.nn.tasks import DetectionModel
 try:
     torch.serialization.add_safe_globals([DetectionModel])
 except AttributeError:
-    # For older PyTorch versions, use weights_only=False when loading instead
     pass
-
-# Disable CUDA for PaddleOCR
-os.environ["FLAGS_use_cuda"] = "0"
 
 class ANPRDetector:
     """Automatic Number Plate Recognition Detector"""
@@ -39,15 +34,7 @@ class ANPRDetector:
         self.model = YOLO(model_path)
         self.conf_threshold = conf_threshold
         
-        # Initialize PaddleOCR
-        self.ocr = PaddleOCR(
-            use_angle_cls=True,
-            lang="en",
-            det=False,
-            rec=True,
-            show_log=False,
-            use_gpu=False
-        )
+        self.ocr = easyocr.Reader(['en'], gpu=False, verbose=False)
     
     def detect_plates(self, image):
         """
@@ -237,14 +224,14 @@ class ANPRDetector:
         
         # Try original image first
         try:
-            ocr_res = self.ocr.ocr(crop, cls=True)
-            if ocr_res and ocr_res[0]:
-                raw_text = "".join([l[1][0] for l in ocr_res[0]])
+            ocr_res = self.ocr.readtext(crop)
+            if ocr_res:
+                raw_text = "".join([item[1] for item in ocr_res])
                 final_plate = self.smart_post_process(raw_text)
                 results.append((raw_text, final_plate))
         except:
             pass
-        
+
         # Try preprocessing methods
         preprocessing_methods = [
             self.preprocess_v1,
@@ -253,13 +240,13 @@ class ANPRDetector:
             self.preprocess_v4,
             self.preprocess_v5
         ]
-        
+
         for preprocess_func in preprocessing_methods:
             try:
                 processed = preprocess_func(crop)
-                ocr_res = self.ocr.ocr(processed, cls=True)
-                if ocr_res and ocr_res[0]:
-                    raw_text = "".join([l[1][0] for l in ocr_res[0]])
+                ocr_res = self.ocr.readtext(processed)
+                if ocr_res:
+                    raw_text = "".join([item[1] for item in ocr_res])
                     final_plate = self.smart_post_process(raw_text)
                     results.append((raw_text, final_plate))
             except:
