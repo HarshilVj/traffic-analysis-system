@@ -39,26 +39,26 @@
 
 
 # ---------- Python UI ----------
-streamlit==1.31.0
+streamlit>=1.31.0
 
-# ---------- YOLO / Torch (Python 3.11 compatible) ----------
-ultralytics==8.0.227
-torch==2.1.2
-torchvision==0.16.2
-torchaudio==2.1.2
+# ---------- YOLO / Torch (Python 3.11+ compatible) ----------
+ultralytics>=8.1.0
+torch>=2.2.0
+torchvision>=0.17.0
+torchaudio>=2.2.0
 
-# ---------- OpenCV (PaddleOCR-compatible) ----------
-opencv-python-headless==4.6.0.66
+# ---------- OpenCV (headless for Streamlit) ----------
+opencv-python-headless>=4.8.0
 
 # ---------- OCR ----------
-paddleocr==2.7.3
-paddlepaddle==2.6.2
+paddleocr>=2.7.0
+paddlepaddle>=2.6.0
 
 # ---------- Core ----------
-numpy==1.26.4
-pandas==2.2.0
-Pillow==10.2.0
+numpy>=1.24.0
+pandas>=2.0.0
+Pillow>=10.0.0
 
 # ---------- Stability ----------
-py-cpuinfo==9.0.0
+py-cpuinfo>=9.0.0
 
