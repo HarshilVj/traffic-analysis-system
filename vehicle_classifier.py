@@ -73,6 +73,53 @@ class VehicleClassifier:
         
         return vehicles
     
+    def track_vehicles(self, frame):
+        """
+        Detect, classify AND track vehicles across video frames.
+
+        Uses Ultralytics' built-in ByteTrack so every vehicle keeps a stable
+        track_id across frames (this is what lets us show one row per vehicle).
+        Call repeatedly on consecutive frames of the same video.
+
+        Args:
+            frame: OpenCV image (BGR format)
+
+        Returns:
+            List of detected vehicles, each including a persistent 'track_id'
+        """
+        results = self.model.track(
+            frame,
+            device="cpu",
+            conf=self.conf_threshold,
+            imgsz=512,
+            max_det=50,
+            persist=True,
+            tracker="bytetrack.yaml",
+            verbose=False
+        )[0]
+
+        vehicles = []
+
+        if results.boxes is not None and results.boxes.id is not None:
+            ids = results.boxes.id.int().cpu().tolist()
+            for box, track_id in zip(results.boxes, ids):
+                cls = int(box.cls[0])
+                conf = float(box.conf[0])
+                class_name = self.model.names[cls]
+                vehicle_type = self.VEHICLE_TYPE_MAP.get(class_name, "UNKNOWN")
+
+                x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+                vehicles.append({
+                    'track_id': int(track_id),
+                    'bbox': (x1, y1, x2, y2),
+                    'class_name': class_name,
+                    'vehicle_type': vehicle_type,
+                    'confidence': conf
+                })
+
+        return vehicles
+
     def classify_single_vehicle(self, image_crop):
         """
         Classify a single vehicle crop

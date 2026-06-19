@@ -275,5 +275,62 @@ class ANPRDetector:
             if non_unreadable:
                 return max(non_unreadable, key=lambda x: len(x[0]))
             return results[0]
-        
+
         return "UNREADABLE", "UNREADABLE"
+
+    def _ocr_once(self, img):
+        """
+        Run a single OCR pass and return (raw_text, avg_confidence).
+
+        Returns (None, 0.0) if nothing was read.
+        """
+        try:
+            ocr_res = self.ocr.ocr(img, cls=True)
+            if ocr_res and ocr_res[0]:
+                texts = [line[1][0] for line in ocr_res[0]]
+                confs = [float(line[1][1]) for line in ocr_res[0]]
+                raw_text = "".join(texts)
+                avg_conf = sum(confs) / len(confs) if confs else 0.0
+                return raw_text, avg_conf
+        except Exception:
+            pass
+        return None, 0.0
+
+    def perform_ocr_with_conf(self, crop):
+        """
+        Same multi-preprocessing OCR as perform_ocr, but also returns the OCR
+        confidence so the video pipeline can rank readings.
+
+        Returns:
+            Tuple of (raw_text, final_plate, ocr_confidence)
+        """
+        if crop is None or crop.size == 0:
+            return "UNREADABLE", "UNREADABLE", 0.0
+
+        candidates = []  # (raw_text, final_plate, ocr_conf)
+
+        raw, conf = self._ocr_once(crop)
+        if raw:
+            candidates.append((raw, self.smart_post_process(raw), conf))
+
+        for preprocess_func in [
+            self.preprocess_v1,
+            self.preprocess_v2,
+            self.preprocess_v3,
+            self.preprocess_v4,
+            self.preprocess_v5,
+        ]:
+            try:
+                raw, conf = self._ocr_once(preprocess_func(crop))
+                if raw:
+                    candidates.append((raw, self.smart_post_process(raw), conf))
+            except Exception:
+                continue
+
+        if not candidates:
+            return "UNREADABLE", "UNREADABLE", 0.0
+
+        # Prefer readings that produced a valid plate, then highest OCR confidence
+        valid = [c for c in candidates if c[1] not in ("INVALID", "UNREADABLE")]
+        pool = valid if valid else candidates
+        return max(pool, key=lambda c: c[2])

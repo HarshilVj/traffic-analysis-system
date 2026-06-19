@@ -47,6 +47,9 @@ torch>=2.2.0
 torchvision>=0.17.0
 torchaudio>=2.2.0
 
+# ---------- Tracking (ByteTrack for video de-duplication) ----------
+lapx>=0.5.5
+
 # ---------- OpenCV (headless for Streamlit) ----------
 opencv-python-headless>=4.8.0
 
