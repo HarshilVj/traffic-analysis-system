@@ -319,9 +319,10 @@ def render_video_tab(vehicle_conf, plate_conf):
 
     col_a, col_b = st.columns(2)
     with col_a:
-        frame_stride = st.slider(
-            "Process every Nth frame", 1, 10, 3,
-            help="Higher = faster, but may miss very fast vehicles."
+        target_fps = st.slider(
+            "ANPR Processing FPS", 1, 25, 5,
+            help="How many frames per second to analyse. Lower = faster on "
+                 "Streamlit Cloud's CPU; higher = catches fast vehicles but slower."
         )
     with col_b:
         min_frames = st.slider(
@@ -348,6 +349,18 @@ def render_video_tab(vehicle_conf, plate_conf):
 
         cap = cv2.VideoCapture(tfile.name)
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+
+        # Convert the target processing FPS into a frame stride using the
+        # video's native frame rate (guard against 0 / NaN from some codecs).
+        native_fps = cap.get(cv2.CAP_PROP_FPS)
+        if not native_fps or native_fps != native_fps or native_fps <= 0:
+            native_fps = 30.0
+        frame_stride = max(1, round(native_fps / target_fps))
+        st.caption(
+            f"Video ≈ {native_fps:.0f} FPS · analysing every {frame_stride} "
+            f"frame(s) ≈ {native_fps / frame_stride:.1f} FPS "
+            f"(target {target_fps} FPS)"
+        )
 
         frame_placeholder = st.empty()
         progress = st.progress(0)
