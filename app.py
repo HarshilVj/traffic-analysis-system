@@ -7,6 +7,7 @@ import io
 import os
 from pathlib import Path
 import tempfile
+import time
 os.environ["YOLO_CPUINFO"] = "False"
 
 # Import custom modules
@@ -304,11 +305,11 @@ def render_image_tab(vehicle_conf, plate_conf):
                 )
 
 def render_video_tab(vehicle_conf, plate_conf):
-    """Video analysis UI: track vehicles and keep one best reading each."""
+    """Play the video in its original form; act only when a plate is clear."""
     st.subheader("📹 Upload Road Video")
     st.caption(
-        "Each vehicle is tracked across frames and de-duplicated — you get one "
-        "row per vehicle, kept at its highest-confidence plate reading."
+        "The video plays in its original form. The system only acts "
+        "(crop → ANPR → OCR) on frames where a number plate is captured clearly."
     )
 
     uploaded_video = st.file_uploader(
@@ -317,19 +318,29 @@ def render_video_tab(vehicle_conf, plate_conf):
         help="Short clips (≤ ~30s, 720p) work best on Streamlit Cloud's CPU."
     )
 
-    col_a, col_b = st.columns(2)
+    col_a, col_b, col_c = st.columns(3)
     with col_a:
-        frame_stride = st.slider(
-            "Process every Nth frame", 1, 10, 3,
-            help="Higher = faster, but may miss very fast vehicles."
+        scan_stride = st.slider(
+            "Scan every Nth frame", 1, 10, 3,
+            help="How often to look for clear plates. Lower = more thorough, slower."
         )
     with col_b:
-        min_frames = st.slider(
-            "Min frames to count a vehicle", 1, 10, 2,
-            help="Filters out one-frame false detections."
+        clarity_conf = st.slider(
+            "Plate clarity (min confidence)", 0.30, 0.95, 0.60, 0.05,
+            help="Only act on plates detected at least this confidently."
+        )
+    with col_c:
+        min_sharpness = st.slider(
+            "Min sharpness (anti-blur)", 0, 300, 80, 10,
+            help="Higher = require sharper, less motion-blurred plates."
         )
 
-    if uploaded_video is not None and st.button("▶️ Process Video", type="primary"):
+    match_fps = st.checkbox(
+        "Play at original speed (FPS)", value=True,
+        help="Best effort: paces playback to the video's FPS between scans."
+    )
+
+    if uploaded_video is not None and st.button("▶️ Play & Capture", type="primary"):
         # Save upload to a temp file so OpenCV can read it
         tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         tfile.write(uploaded_video.read())
@@ -343,47 +354,78 @@ def render_video_tab(vehicle_conf, plate_conf):
         anpr_detector.conf_threshold = plate_conf
 
         processor = VideoProcessor(
-            anpr_detector, vehicle_classifier, min_frames=min_frames
+            anpr_detector, vehicle_classifier,
+            clarity_conf=clarity_conf, min_sharpness=float(min_sharpness)
         )
 
         cap = cv2.VideoCapture(tfile.name)
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        frame_interval = 1.0 / fps if fps > 0 else 0.0
 
-        frame_placeholder = st.empty()
+        st.markdown("#### ▶️ Playback (original)")
+        video_ph = st.empty()
         progress = st.progress(0)
         status = st.empty()
-        live_table = st.empty()
+        st.markdown("#### 📸 Latest Capture")
+        capture_ph = st.empty()
+        st.markdown("#### 📋 Captured So Far")
+        table_ph = st.empty()
 
         idx = 0
-        processed = 0
         while True:
+            t0 = time.time()
             ret, frame = cap.read()
             if not ret:
                 break
 
-            if idx % frame_stride == 0:
-                annotated = processor.process_frame(frame)
-                processed += 1
+            # Playback: always show the ORIGINAL frame (no overlays)
+            video_ph.image(
+                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), use_column_width=True
+            )
 
-                annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-                frame_placeholder.image(
-                    annotated_rgb, caption=f"Frame {idx}", use_column_width=True
-                )
-                if total:
-                    progress.progress(min(1.0, idx / total))
-                status.text(
-                    f"Processed {processed} frame(s) · "
-                    f"{len(processor.tracks)} vehicle(s) tracked"
-                )
-
-                # Refresh the running list every few processed frames
-                if processed % 5 == 0:
-                    live = processor.get_results()
-                    if live:
-                        live_table.dataframe(
-                            create_results_dataframe(live).reset_index(drop=True),
+            # Only scan some frames for clear plates (keeps playback moving)
+            if idx % scan_stride == 0:
+                captures = processor.scan_frame(frame)
+                if captures:
+                    latest = captures[-1]
+                    with capture_ph.container():
+                        cc1, cc2 = st.columns([1, 2])
+                        with cc1:
+                            if latest['plate_crop'] is not None and latest['plate_crop'].size > 0:
+                                st.image(
+                                    cv2.cvtColor(latest['plate_crop'], cv2.COLOR_BGR2RGB),
+                                    use_column_width=True
+                                )
+                        with cc2:
+                            st.success(
+                                f"📸 Track {latest['track_id']}: **{latest['final_plate']}**"
+                            )
+                            st.caption(
+                                f"{latest['vehicle_type']} · plate "
+                                f"{latest['plate_confidence']:.0%} · ocr "
+                                f"{latest['ocr_confidence']:.0%} · sharpness "
+                                f"{latest['sharpness']:.0f}"
+                            )
+                    res = processor.get_results()
+                    if res:
+                        table_ph.dataframe(
+                            create_results_dataframe(res).reset_index(drop=True),
                             use_container_width=True
                         )
+
+            if total:
+                progress.progress(min(1.0, (idx + 1) / total))
+            status.text(
+                f"Frame {idx} · {len(processor.tracks)} vehicle(s) seen · "
+                f"{len(processor.get_results())} captured"
+            )
+
+            # Pace playback to the original FPS (best effort)
+            if match_fps and frame_interval > 0:
+                elapsed = time.time() - t0
+                if elapsed < frame_interval:
+                    time.sleep(frame_interval - elapsed)
 
             idx += 1
 
@@ -397,7 +439,7 @@ def render_video_tab(vehicle_conf, plate_conf):
         st.session_state.video_results = processor.get_results()
         st.session_state.video_done = True
         st.success(
-            f"✅ Done! {len(st.session_state.video_results)} unique vehicle(s) detected."
+            f"✅ Done! {len(st.session_state.video_results)} vehicle(s) captured clearly."
         )
 
     # Final results
