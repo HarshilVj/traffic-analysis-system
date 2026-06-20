@@ -25,6 +25,7 @@ class VideoProcessor:
         self.min_frames = min_frames          # ignore tracks seen fewer times
         self.min_plate_area = min_plate_area  # skip tiny/far-away plates
         self.tracks = {}                      # track_id -> best record
+        self.last_vehicles = []               # last tracked boxes (for in-between frames)
 
     def _empty_record(self, track_id):
         return {
@@ -50,6 +51,7 @@ class VideoProcessor:
         Returns the annotated frame (BGR) for live preview.
         """
         vehicles = self.vehicles.track_vehicles(frame)
+        self.last_vehicles = vehicles
 
         for v in vehicles:
             tid = v['track_id']
@@ -110,6 +112,14 @@ class VideoProcessor:
                 rec['ocr_confidence'] = ocr_conf
 
         return self._draw_frame(frame, vehicles)
+
+    def draw(self, frame):
+        """
+        Lightweight overlay for frames where ANPR did NOT run: re-draws the most
+        recent tracked boxes/labels. Lets the output video stay at full FPS while
+        ANPR runs at a lower rate.
+        """
+        return self._draw_frame(frame, self.last_vehicles)
 
     def _draw_frame(self, frame, vehicles):
         """Draw current-frame boxes with each vehicle's running-best plate."""

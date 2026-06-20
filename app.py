@@ -7,6 +7,7 @@ import io
 import os
 from pathlib import Path
 import tempfile
+import imageio
 os.environ["YOLO_CPUINFO"] = "False"
 
 # Import custom modules
@@ -54,6 +55,8 @@ if 'video_done' not in st.session_state:
     st.session_state.video_done = False
 if 'video_results' not in st.session_state:
     st.session_state.video_results = None
+if 'video_out_bytes' not in st.session_state:
+    st.session_state.video_out_bytes = None
 
 def initialize_models():
     """Initialize YOLO models for ANPR and vehicle classification"""
@@ -319,9 +322,10 @@ def render_video_tab(vehicle_conf, plate_conf):
 
     col_a, col_b = st.columns(2)
     with col_a:
-        frame_stride = st.slider(
-            "Process every Nth frame", 1, 10, 3,
-            help="Higher = faster, but may miss very fast vehicles."
+        anpr_fps = st.slider(
+            "ANPR Processing FPS", 1, 25, 5,
+            help="How many frames per second to actually run detection/OCR on. "
+                 "Lower = faster processing; playback stays smooth regardless."
         )
     with col_b:
         min_frames = st.slider(
@@ -349,6 +353,22 @@ def render_video_tab(vehicle_conf, plate_conf):
         cap = cv2.VideoCapture(tfile.name)
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
 
+        # Native FPS drives smooth playback; clamp to a sane 1-30 range.
+        source_fps = cap.get(cv2.CAP_PROP_FPS)
+        if not source_fps or source_fps != source_fps or source_fps <= 0:  # 0 / NaN guard
+            source_fps = 25.0
+        playback_fps = float(min(30.0, max(1.0, source_fps)))
+
+        # Run ANPR only every Nth frame to hit the requested processing FPS.
+        process_stride = max(1, round(playback_fps / anpr_fps))
+
+        # Annotated output video (H.264) for smooth in-browser playback.
+        out_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+        writer = imageio.get_writer(
+            out_path, fps=playback_fps, codec="libx264",
+            quality=8, macro_block_size=2, pixelformat="yuv420p"
+        )
+
         frame_placeholder = st.empty()
         progress = st.progress(0)
         status = st.empty()
@@ -361,43 +381,68 @@ def render_video_tab(vehicle_conf, plate_conf):
             if not ret:
                 break
 
-            if idx % frame_stride == 0:
-                annotated = processor.process_frame(frame)
+            if idx % process_stride == 0:
+                annotated = processor.process_frame(frame)  # heavy: track + OCR
                 processed += 1
+            else:
+                annotated = processor.draw(frame)           # light: reuse last boxes
 
-                annotated_rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-                frame_placeholder.image(
-                    annotated_rgb, caption=f"Frame {idx}", use_column_width=True
-                )
+            # Write every frame so the output plays at full, smooth FPS
+            writer.append_data(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB))
+
+            # Cheap progress UI (NOT the playback): refresh occasionally
+            if idx % max(1, int(playback_fps)) == 0:
                 if total:
                     progress.progress(min(1.0, idx / total))
                 status.text(
-                    f"Processed {processed} frame(s) · "
+                    f"Processing… {idx}/{total} frames · "
                     f"{len(processor.tracks)} vehicle(s) tracked"
                 )
-
-                # Refresh the running list every few processed frames
-                if processed % 5 == 0:
-                    live = processor.get_results()
-                    if live:
-                        live_table.dataframe(
-                            create_results_dataframe(live).reset_index(drop=True),
-                            use_container_width=True
-                        )
+                frame_placeholder.image(
+                    cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB),
+                    caption="Processing preview", use_column_width=True
+                )
+                live = processor.get_results()
+                if live:
+                    live_table.dataframe(
+                        create_results_dataframe(live).reset_index(drop=True),
+                        use_container_width=True
+                    )
 
             idx += 1
 
         cap.release()
+        writer.close()
         try:
             os.unlink(tfile.name)
         except OSError:
             pass
 
+        with open(out_path, "rb") as f:
+            st.session_state.video_out_bytes = f.read()
+        try:
+            os.unlink(out_path)
+        except OSError:
+            pass
+
         progress.progress(1.0)
+        frame_placeholder.empty()
         st.session_state.video_results = processor.get_results()
         st.session_state.video_done = True
         st.success(
             f"✅ Done! {len(st.session_state.video_results)} unique vehicle(s) detected."
+        )
+
+    # Smooth annotated playback (native browser player)
+    if st.session_state.video_done and st.session_state.video_out_bytes:
+        st.markdown("---")
+        st.subheader("🎬 Annotated Video (smooth playback)")
+        st.video(st.session_state.video_out_bytes)
+        st.download_button(
+            label="📥 Download Annotated Video",
+            data=st.session_state.video_out_bytes,
+            file_name="traffic_analysis_annotated.mp4",
+            mime="video/mp4",
         )
 
     # Final results

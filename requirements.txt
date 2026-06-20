@@ -50,6 +50,10 @@ torchaudio>=2.2.0
 # ---------- Tracking (ByteTrack for video de-duplication) ----------
 lapx>=0.5.5
 
+# ---------- Video encoding (smooth H.264 playback in browser) ----------
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.9
+
 # ---------- OpenCV (headless for Streamlit) ----------
 opencv-python-headless>=4.8.0
 
