@@ -7,7 +7,6 @@ import io
 import os
 from pathlib import Path
 import tempfile
-import time
 os.environ["YOLO_CPUINFO"] = "False"
 
 # Import custom modules
@@ -305,17 +304,19 @@ def render_image_tab(vehicle_conf, plate_conf):
                 )
 
 def render_video_tab(vehicle_conf, plate_conf):
-    """Play the video in its original form; act only when a plate is clear."""
+    """Browser plays the original video smoothly; detection runs decoupled."""
     st.subheader("📹 Upload Road Video")
     st.caption(
-        "The video plays in its original form. The system only acts "
-        "(crop → ANPR → OCR) on frames where a number plate is captured clearly."
+        "The video plays smoothly in your browser (original form, no overlays). "
+        "Detection runs separately and clear-plate captures stream in below as "
+        "they're found."
     )
 
     uploaded_video = st.file_uploader(
         "Choose a traffic video...",
         type=["mp4", "avi", "mov", "mkv"],
-        help="Short clips (≤ ~30s, 720p) work best on Streamlit Cloud's CPU."
+        help="MP4 (H.264) plays back smoothest in the browser. "
+             "Short clips (≤ ~30s, 720p) process fastest on Streamlit Cloud's CPU."
     )
 
     col_a, col_b, col_c = st.columns(3)
@@ -335,15 +336,17 @@ def render_video_tab(vehicle_conf, plate_conf):
             help="Higher = require sharper, less motion-blurred plates."
         )
 
-    match_fps = st.checkbox(
-        "Play at original speed (FPS)", value=True,
-        help="Best effort: paces playback to the video's FPS between scans."
-    )
-
     if uploaded_video is not None and st.button("▶️ Play & Capture", type="primary"):
-        # Save upload to a temp file so OpenCV can read it
+        # Read the upload once: feed the bytes to the browser player AND to OpenCV
+        video_bytes = uploaded_video.getvalue()
+
+        # Smooth playback — handled entirely by the browser, zero server cost
+        st.markdown("#### ▶️ Playback (original, plays in your browser)")
+        st.video(video_bytes)
+
+        # Save to a temp file so OpenCV can read frames for processing
         tfile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
-        tfile.write(uploaded_video.read())
+        tfile.write(video_bytes)
         tfile.close()
 
         anpr_detector, vehicle_classifier = initialize_models()
@@ -360,31 +363,22 @@ def render_video_tab(vehicle_conf, plate_conf):
 
         cap = cv2.VideoCapture(tfile.name)
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
-        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-        frame_interval = 1.0 / fps if fps > 0 else 0.0
 
-        st.markdown("#### ▶️ Playback (original)")
-        video_ph = st.empty()
-        progress = st.progress(0)
-        status = st.empty()
         st.markdown("#### 📸 Latest Capture")
         capture_ph = st.empty()
         st.markdown("#### 📋 Captured So Far")
+        progress = st.progress(0)
+        status = st.empty()
         table_ph = st.empty()
 
         idx = 0
         while True:
-            t0 = time.time()
             ret, frame = cap.read()
             if not ret:
                 break
 
-            # Playback: always show the ORIGINAL frame (no overlays)
-            video_ph.image(
-                cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), use_column_width=True
-            )
-
-            # Only scan some frames for clear plates (keeps playback moving)
+            # Only the scanned frames do any heavy work; the video keeps playing
+            # smoothly in the browser regardless of how long this takes.
             if idx % scan_stride == 0:
                 captures = processor.scan_frame(frame)
                 if captures:
@@ -417,15 +411,10 @@ def render_video_tab(vehicle_conf, plate_conf):
             if total:
                 progress.progress(min(1.0, (idx + 1) / total))
             status.text(
-                f"Frame {idx} · {len(processor.tracks)} vehicle(s) seen · "
+                f"Scanned up to frame {idx}/{total} · "
+                f"{len(processor.tracks)} vehicle(s) seen · "
                 f"{len(processor.get_results())} captured"
             )
-
-            # Pace playback to the original FPS (best effort)
-            if match_fps and frame_interval > 0:
-                elapsed = time.time() - t0
-                if elapsed < frame_interval:
-                    time.sleep(frame_interval - elapsed)
 
             idx += 1
 
