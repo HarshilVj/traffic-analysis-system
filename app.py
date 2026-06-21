@@ -320,9 +320,10 @@ def render_video_tab(vehicle_conf, plate_conf):
 
     col_a, col_b, col_c = st.columns(3)
     with col_a:
-        scan_stride = st.slider(
-            "Scan every Nth frame", 1, 10, 3,
-            help="How often to look for clear plates. Lower = more thorough, slower."
+        target_fps = st.slider(
+            "Target scan rate (FPS)", 1, 15, 5,
+            help="How many frames per second to scan for clear plates. "
+                 "The stride is computed from the video's native FPS."
         )
     with col_b:
         clarity_conf = st.slider(
@@ -360,8 +361,19 @@ def render_video_tab(vehicle_conf, plate_conf):
 
         cap = cv2.VideoCapture(tfile.name)
         total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
-        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-        frame_interval = 1.0 / fps if fps > 0 else 0.0
+
+        # Native FPS — guard against 0 / NaN reported by some codecs
+        native_fps = cap.get(cv2.CAP_PROP_FPS)
+        if not native_fps or native_fps != native_fps or native_fps <= 0:
+            native_fps = 30.0
+        frame_interval = 1.0 / native_fps
+
+        # Convert the target scan rate into a frame stride
+        scan_stride = max(1, round(native_fps / target_fps))
+        st.caption(
+            f"Native {native_fps:.0f} FPS · scanning every {scan_stride} frame(s) "
+            f"(~{native_fps / scan_stride:.0f} FPS)"
+        )
 
         st.markdown("#### ▶️ Playback (original)")
         video_ph = st.empty()
